@@ -1,7 +1,7 @@
 [features]
 seeds = false
 [programs.localnet]
-rustsolana = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+rustsolana = "FBGuPRJQSdTuvw6d6Fo54occHL6XwMjEdxz7xiowxRZd"
 
 [registry]
 url = "https://anchor.projectserum.com"
