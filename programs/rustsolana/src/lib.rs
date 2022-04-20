@@ -44,6 +44,20 @@ pub mod rustsolana {
         Ok(())
     }
 
+    pub fn close(ctx: Context<Close>) -> ProgramResult {
+        if ctx.accounts.fund.founder != ctx.accounts.founder.key()
+        {
+            return Err(ProgramError::IllegalOwner)
+        }
+        let fund = &mut ctx.accounts.fund;
+        if fund.donations == 0
+        {
+            return Err(ProgramError::InvalidAccountData)
+        }
+        fund.donations -= 1;
+        Ok(())
+    }
+
     pub fn withdraw(ctx: Context<Withdraw>) -> ProgramResult {
         if ctx.accounts.fund.founder != ctx.accounts.founder.key()
         {
@@ -59,6 +73,7 @@ pub mod rustsolana {
 pub struct Create<'info> {
     #[account(
         init,
+        rent_exempt = enforce,
         payer = founder,
         space = Fund::LEN,
         seeds = [b"fund"],
@@ -78,6 +93,7 @@ pub struct Donate<'info> {
     pub fund: Account<'info, Fund>,
     #[account(
         init,
+        rent_exempt = enforce,
         payer = donor,
         space = Donation::LEN,
         seeds = [b"donation", &fund.donations.to_be_bytes()],
@@ -93,6 +109,22 @@ pub struct Withdraw<'info> {
     /// CHECK: this one must be the founder stored in fund
     pub founder: UncheckedAccount<'info>,
     #[account(mut, seeds = [b"fund"], bump = fund.bump, close = founder)]
+    pub fund: Account<'info, Fund>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct Close<'info> {
+    #[account(mut)]
+    /// CHECK: this one must be the founder stored in fund
+    pub founder: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        seeds = [b"donation", &(fund.donations - 1).to_be_bytes()],
+        bump = donation.bump,
+        close = founder)]
+    pub donation: Account<'info, Donation>,
+    #[account(mut)]
     pub fund: Account<'info, Fund>,
     pub system_program: Program<'info, System>,
 }

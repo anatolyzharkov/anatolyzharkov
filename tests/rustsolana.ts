@@ -9,6 +9,7 @@ describe('rustsolana', async () => {
   anchor.setProvider(provider);
   const connection = anchor.getProvider().connection;
   const program = anchor.workspace.Rustsolana
+  const founder = anchor.web3.Keypair.generate();
 
   let [fundPDA, _] = await PublicKey.findProgramAddress(
         [Buffer.from("fund")],
@@ -16,17 +17,20 @@ describe('rustsolana', async () => {
       );
 
   it('Create a fund', async() => {
+    let signature = await connection.requestAirdrop(founder.publicKey, 10000000);
+    await connection.confirmTransaction(signature);
+
     await program.rpc.create( {
       accounts: {
         fund: fundPDA,
-        founder: provider.wallet.publicKey,
+        founder: founder.publicKey,
         systemProgram: SystemProgram.programId
       },
-      signers: []
+      signers: [founder]
     })
 
     const account = await program.account.fund.fetch(fundPDA)
-    assert.ok(account.founder.equals(provider.wallet.publicKey))
+    assert.ok(account.founder.equals(founder.publicKey))
   })
 
   it('Donate to fund', async() => {
@@ -77,7 +81,7 @@ describe('rustsolana', async () => {
 
     const accountBefore = await program.account.fund.fetch(fundPDA)
 
-    let [donationPDA, _] = await PublicKey.findProgramAddress(
+    const [donationPDA, _] = await PublicKey.findProgramAddress(
       [
         Buffer.from("donation"),
         accountBefore.donations.toBuffer('be', 8)
@@ -110,29 +114,51 @@ describe('rustsolana', async () => {
   })
 
   it('Withdrawal from fund', async() => {
-
-    const founderBefore = await connection.getBalance(provider.wallet.publicKey);
+    const founderBefore = await connection.getBalance(founder.publicKey);
     const fundBefore = await connection.getBalance(fundPDA);
+
+    const accountBefore = await program.account.fund.fetch(fundPDA)
+
+    let i = accountBefore.donations;
+    let rentSum = 0;
+    while (i > 0) {
+      const [donationPDA, _] = await PublicKey.findProgramAddress(
+        [
+          Buffer.from("donation"),
+          new anchor.BN(i - 1).toBuffer('be', 8)
+        ],
+        program.programId
+        );
+
+      const rent = await connection.getBalance(donationPDA);
+      rentSum += rent;
+
+      await program.rpc.close({
+        accounts: {
+          founder: founder.publicKey,
+          donation: donationPDA,
+          fund: fundPDA,
+          systemProgram: SystemProgram.programId
+        },
+        signers: []
+      })
+      i--;
+    }
 
     await program.rpc.withdraw({
       accounts: {
-        founder: provider.wallet.publicKey,
+        founder: founder.publicKey,
         fund: fundPDA,
         systemProgram: SystemProgram.programId
       },
       signers: []
     })
 
-    const founderAfter = await connection.getBalance(provider.wallet.publicKey);
+    const founderAfter = await connection.getBalance(founder.publicKey);
     const fundAfter = await connection.getBalance(fundPDA);
 
     assert.ok(fundAfter === 0)
-    console.log("founderBefore", founderBefore);
-    console.log("founderAfter", founderAfter);
-    console.log("founderBefore + fundBefore", founderBefore + fundBefore);
-    console.log("Lamports lost", founderBefore + fundBefore - founderAfter)
-    assert.ok(founderAfter === founderBefore + fundBefore)
-
+    assert.ok(founderAfter === founderBefore + fundBefore + rentSum)
   })
 
   it('Try to rob the fund', async() => {
