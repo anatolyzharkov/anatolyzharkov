@@ -113,6 +113,33 @@ describe('rustsolana', async () => {
     assert.ok(accountAfter.donations.eq(new anchor.BN(2)))
   })
 
+  it('Try to rob the fund', async() => {
+    const thief = anchor.web3.Keypair.generate();
+    const fundBefore = await connection.getBalance(fundPDA);
+    const thiefBefore = await connection.getBalance(thief.publicKey);
+
+    try {
+      await program.rpc.withdraw({
+      accounts: {
+        founder: thief.publicKey,
+        fund: fundPDA,
+        systemProgram: SystemProgram.programId
+      },
+      signers: []
+    }
+    )
+    assert.ok(false);
+    } catch (error) {
+      assert.ok(true);
+    }
+
+    const fundAfter = await connection.getBalance(fundPDA);
+    const thiefAfter = await connection.getBalance(thief.publicKey);
+
+    assert.ok(fundAfter === fundBefore)
+    assert.ok(thiefAfter === thiefBefore)
+  })
+
   it('Withdrawal from fund', async() => {
     const founderBefore = await connection.getBalance(founder.publicKey);
     const fundBefore = await connection.getBalance(fundPDA);
@@ -160,32 +187,4 @@ describe('rustsolana', async () => {
     assert.ok(fundAfter === 0)
     assert.ok(founderAfter === founderBefore + fundBefore + rentSum)
   })
-
-  it('Try to rob the fund', async() => {
-    const thief = anchor.web3.Keypair.generate();
-    const fundBefore = await connection.getBalance(fundPDA);
-    const thiefBefore = await connection.getBalance(thief.publicKey);
-
-    try {
-      await program.rpc.withdraw({
-      accounts: {
-        founder: thief.publicKey,
-        fund: fundPDA,
-        systemProgram: SystemProgram.programId
-      },
-      signers: []
-    }
-    )
-    assert.ok(false);
-    } catch (error) {
-      assert.ok(true);
-    }
-
-    const fundAfter = await connection.getBalance(fundPDA);
-    const thiefAfter = await connection.getBalance(thief.publicKey);
-
-    assert.ok(fundAfter === fundBefore)
-    assert.ok(thiefAfter === thiefBefore)
-  })
-
 })
