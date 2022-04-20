@@ -40,7 +40,7 @@ describe('rustsolana', async () => {
     let [donationPDA, _] = await PublicKey.findProgramAddress(
       [
         Buffer.from("donation"),
-        accountBefore.donations.toBuffer('le', 8)
+        accountBefore.donations.toBuffer('be', 8)
       ],
       program.programId
     );
@@ -69,6 +69,46 @@ describe('rustsolana', async () => {
     assert.ok(accountAfter.donations.eq(new anchor.BN(1)))
   })
 
+  it('Second donate', async() => {
+    const donor = anchor.web3.Keypair.generate();
+    const donation = 3000000000;
+    let signature = await connection.requestAirdrop(donor.publicKey, donation);
+    await connection.confirmTransaction(signature);
+
+    const accountBefore = await program.account.fund.fetch(fundPDA)
+
+    let [donationPDA, _] = await PublicKey.findProgramAddress(
+      [
+        Buffer.from("donation"),
+        accountBefore.donations.toBuffer('be', 8)
+      ],
+      program.programId
+    );
+
+    const donorBefore = await connection.getBalance(donor.publicKey);
+    const fundBefore = await connection.getBalance(fundPDA);
+
+    await program.rpc.donate(new anchor.BN(donation), {
+      accounts: {
+        donor: donor.publicKey,
+        donation: donationPDA,
+        fund: fundPDA,
+        systemProgram: SystemProgram.programId
+      },
+      signers: [donor]
+    })
+
+    const donorAfter = await connection.getBalance(donor.publicKey);
+    const fundAfter = await connection.getBalance(fundPDA);
+    const rent = await connection.getBalance(donationPDA);
+
+    assert.ok(donorAfter === donorBefore - donation)
+    assert.ok(fundAfter === fundBefore + donation - rent)
+
+    const accountAfter = await program.account.fund.fetch(fundPDA)
+    assert.ok(accountAfter.donations.eq(new anchor.BN(2)))
+  })
+
   it('Withdrawal from fund', async() => {
 
     const founderBefore = await connection.getBalance(provider.wallet.publicKey);
@@ -87,6 +127,10 @@ describe('rustsolana', async () => {
     const fundAfter = await connection.getBalance(fundPDA);
 
     assert.ok(fundAfter === 0)
+    console.log("founderBefore", founderBefore);
+    console.log("founderAfter", founderAfter);
+    console.log("founderBefore + fundBefore", founderBefore + fundBefore);
+    console.log("Lamports lost", founderBefore + fundBefore - founderAfter)
     assert.ok(founderAfter === founderBefore + fundBefore)
 
   })
