@@ -11,14 +11,28 @@ pub mod rustsolana {
         let fund = &mut ctx.accounts.fund;
         fund.founder = ctx.accounts.founder.key();
         fund.bump = *ctx.bumps.get("fund").unwrap();
+        fund.donations = 0;
         Ok(())
     }
 
     pub fn donate(ctx: Context<Donate>, amount: u64) -> ProgramResult {
+        let fund = &mut ctx.accounts.fund;
+        fund.donations += 1;
+        let donation = &mut ctx.accounts.donation;
+        donation.bump = *ctx.bumps.get("donation").unwrap();
+        donation.donor = ctx.accounts.donor.key();
+        donation.amount = amount;
+
+        let rent = donation.to_account_info().lamports();
+
+        if amount < rent {
+            return Err(ProgramError::InvalidArgument)
+        }
+
         let ix = anchor_lang::solana_program::system_instruction::transfer(
             &ctx.accounts.donor.key(),
             &ctx.accounts.fund.key(),
-            amount,
+            amount - rent,
         );
         anchor_lang::solana_program::program::invoke(
             &ix,
@@ -46,7 +60,7 @@ pub struct Create<'info> {
     #[account(
         init,
         payer = founder,
-        space = 8 + 1 + 32,
+        space = Fund::LEN,
         seeds = [b"fund"],
         bump
     )]
@@ -62,6 +76,14 @@ pub struct Donate<'info> {
     pub donor: Signer<'info>,
     #[account(mut, seeds = [b"fund"], bump = fund.bump)]
     pub fund: Account<'info, Fund>,
+    #[account(
+        init,
+        payer = donor,
+        space = Donation::LEN,
+        seeds = [b"donation", &fund.donations.to_be_bytes()],
+        bump
+    )]
+    pub donation: Account<'info, Donation>,
     pub system_program: Program<'info, System>,
 }
 
@@ -79,4 +101,20 @@ pub struct Withdraw<'info> {
 pub struct Fund {
     pub bump: u8,
     pub founder: Pubkey,
+    pub donations: u64,
+}
+
+impl Fund {
+    const LEN: usize = 8 + 1 + 32 + 8;
+}
+
+#[account]
+pub struct Donation {
+    pub bump: u8,
+    pub donor: Pubkey,
+    pub amount: u64,
+}
+
+impl Donation {
+    const LEN: usize = 8 + 1 + 32 + 8;
 }
