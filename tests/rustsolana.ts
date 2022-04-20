@@ -71,6 +71,10 @@ describe('rustsolana', async () => {
 
     const accountAfter = await program.account.fund.fetch(fundPDA)
     assert.ok(accountAfter.donations.eq(new anchor.BN(1)))
+
+    const donationAccount = await program.account.donation.fetch(donationPDA)
+    assert.ok(donationAccount.donor.equals(donor.publicKey))
+    assert.ok(donationAccount.amount.eq(new anchor.BN(donation)))
   })
 
   it('Second donate', async() => {
@@ -111,6 +115,10 @@ describe('rustsolana', async () => {
 
     const accountAfter = await program.account.fund.fetch(fundPDA)
     assert.ok(accountAfter.donations.eq(new anchor.BN(2)))
+
+    const donationAccount = await program.account.donation.fetch(donationPDA)
+    assert.ok(donationAccount.donor.equals(donor.publicKey))
+    assert.ok(donationAccount.amount.eq(new anchor.BN(donation)))
   })
 
   it('Try to rob the fund', async() => {
