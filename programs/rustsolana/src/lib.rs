@@ -61,11 +61,12 @@ pub mod rustsolana {
     pub fn withdraw(ctx: Context<Withdraw>) -> ProgramResult {
         if ctx.accounts.fund.founder != ctx.accounts.founder.key()
         {
-            Err(ProgramError::IllegalOwner)
+            return Err(ProgramError::IllegalOwner)
         }
-        else {
-            Ok(())
+        if ctx.accounts.fund.donations != 0 {
+            return Err(ProgramError::InvalidAccountData)
         }
+        Ok(())
     }
 }
 

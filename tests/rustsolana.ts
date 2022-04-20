@@ -140,6 +140,29 @@ describe('rustsolana', async () => {
     assert.ok(thiefAfter === thiefBefore)
   })
 
+  it('Withdrawal without garbage colection', async() => {
+    const fundBefore = await connection.getBalance(fundPDA);
+    const founderBefore = await connection.getBalance(founder.publicKey);
+
+    try {
+      await program.rpc.withdraw({
+        accounts: {
+          founder: founder.publicKey,
+          fund: fundPDA,
+          systemProgram: SystemProgram.programId
+        },
+        signers: []
+      })
+      assert.ok(false);
+    } catch (error) {
+      assert.ok(true);
+    }
+    const fundAfter = await connection.getBalance(fundPDA);
+    const founderAfter = await connection.getBalance(founder.publicKey);
+    assert.ok(fundAfter === fundBefore)
+    assert.ok(founderAfter === founderBefore)
+  })
+
   it('Withdrawal from fund', async() => {
     const founderBefore = await connection.getBalance(founder.publicKey);
     const fundBefore = await connection.getBalance(fundPDA);
@@ -150,11 +173,11 @@ describe('rustsolana', async () => {
     let rentSum = 0;
     while (i > 0) {
       const [donationPDA, _] = await PublicKey.findProgramAddress(
-        [
-          Buffer.from("donation"),
-          new anchor.BN(i - 1).toBuffer('be', 8)
-        ],
-        program.programId
+          [
+            Buffer.from("donation"),
+            new anchor.BN(i - 1).toBuffer('be', 8)
+          ],
+          program.programId
         );
 
       const rent = await connection.getBalance(donationPDA);
